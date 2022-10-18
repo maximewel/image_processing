@@ -9,7 +9,7 @@ The /out folder has:
 
 * Three examples of grayscale image equalization with equalized_(Baboon, lena, Beetle).jpg
 * The original image equalized in RGB and HSL (L channel) domains as hsl_rgb_equalisations_results.jpg
-* The original image with its RGB and re-converted HSL equalizations's histograms over the 3 channels as hsl_rgb_equalisations_histograms
+* The original image with its RGB and re-converted HSL equalizations's histograms over the 3 channels as hsl_rgb_equalisations_histograms.jpg
 
 Algo: The algorithm is explained in depth in the jupyter notebook and is rather simple.
 * The HSL_to_RGB and reverse algorithm are directly taken from the source given in the assignement document.
@@ -24,5 +24,14 @@ The L channel is effectively a real value between 0 and 1. Therefore, the regula
 * Secondly, the equalization is done using this discrete integer channel
 * Finaly, the resulting equalized channel is passed through the real function again to go back to a [0,1] domain
 
+## 3) (c) Visually compare the result of the two images after equalizing the histograms (RGB and HSL). What can you observe?
+I made a respose in the notebook, here is the extract to read in the context of the hsl_rgb_equalization_(result,histograms):\
+About images:
+> The HSL-encoded image preserve the general aspect of the image way better while still having the equalization effect (Using the whole channel). Let's look at the comparative histogram of the resulting RGB/HSL rgb images
+
+About the histograms:
+> Even though the whole domain is utilized in both cases and each channel is spread more evenly, the RGB equalization has treated the component separately - resulting in a widening of the 3 channels, and a loss of their respective proportionnality. With the HSL separation, as the L channel encodes the 3 colors in itself, there is a more consistent equalization of the histogram that conserves image's features such as its dominant color (red for Lena).
+
+TL;DR: RGB equalization on each channel works as in the image is brighter and has more contrast, but it seems to lose information / change the picture. This is probably due do the loss of proportionality between the r,g,b channel that is present in the original pixel encoding. HSL equalization does preserve the proportionality by equalizing a channel (L) that is affected / related to the three channels in RGB. The histograms are also equalized, but the picture kept its general features such as color space.
 
 Note: For further questions, don't hesitate to contact me. You can play with the jupyter notebook to observe the algorithm on different images of the input folder.
