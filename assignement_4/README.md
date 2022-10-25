@@ -49,7 +49,7 @@ I do the padding myself and not use the cv2.pad() method so I can explain exactl
   * Horizontal gradient, kernel from the course formula
   * Vertical gradient, kernel from the course formula
   * Addition via cv2.max that keeps intensity of both images (regular ndarray addition does a modula, and thus loses high intensity information)
-  * For the gradient filter, I had to add a "abs" value at the end of my kernel of I would have had negative values in my images. I could also truncate them to 0.
+  * For the gradient filters / LoG filters, a clipping has been added to the return value of the kernel computation or thre would be negative values in the images.
   * kernels are 1D but are coded in 2D as my apply_kernel function always expects a 2D kernel
 
 # and the responses to the questions 1. c), 2. d) et 3. c).
@@ -68,11 +68,15 @@ There is a clear effect of blank padding on images are it tends to add a black f
 
 ## 2.d) Comment on the results obtained with the two methods
 
-* The gradient edge detection works in two steps that can be combined as shown above. The result is an image that has sharp lines and very precise edges around great changes in intensity.
-* The Laplacian of Gaussian works in one step but has a bigger kernel - and the kernel used above is not he biggest one that can be computed. The filter's resulting image seems to separate the background in black from the principal shapes that are activated in white. 
+* The gradient edge detection works in two steps that can be combined as shown above with a clipped addition of the images. The result is an image that has sharp lines and very precise edges around great changes in intensity. 
+    * The gradients used are horiontal and vertical and both direction are well repreesnted, however some diagonal edges seem difficult to get (e.g. the Stop sign)
+* The Laplacian of Gaussian works in one step but has a bigger kernel - and the kernel used above is not he biggest one that can be computed. The filter's resulting image again finds sharp edges from the images, but is activated more intensfully across the whole image
+    * The LoG finds finer edges and is more activated as shown on the Ara image
+    * The LoG detects edges in all directions
 
-The gradiant methods is done in vertical / horizontal steps, meaning they have a greatly reduced complexity if done right. If the Laplacian kernel is separable (it sure seems like it), both methods would be similar in complexity.\
-The gradiant filters extract sharp edges (lines) separating objects whereas the Laplacian filter activates shapes that are filled - in order to have the same result, we would have to either apply a region mecanism for the gradiants or only take the edges for the Laplacian All in all, both produce great results and are already extracting most of the simple shapes of the three images tested (Lena, Stop, Ara)
+The gradiant methods is done in vertical / horizontal steps, meaning they have a greatly reduced complexity if done right. If the Laplacian kernel is separable (it sure seems like it), both methods would be similar in complexity for the same original kernel size.\
+\
+Both gradient filters find edges convincingly. The LoG seems more powerfull than the 2 combined gradients at first glance because of its more intense edge-detecting power and its versatility in regards to the direction of the edges, meanwhile the two basic gradients filter used are horizontal and vertical. At the same time, it seems like separating regions of the images (e.g. for identification of the shapes and/or detection of particular shapes) would be easier with the former rater than the latter, which has a lot of activations inside a single shape. For example, Ara is well outlined by the gradients but filled with internal matches with the LoG.
 
 ## 3.c) Comment on the results obtained with the individual filters and their combination
 
@@ -83,8 +87,8 @@ The gradiant filters extract sharp edges (lines) separating objects whereas the 
 
 In both cases, the homogenous parts of the image stay the same as a min/max has basically no effect. But every low-intensity region is amplified by the min and every high-intensity region is amplified by the max filter.
 
-* Max - Min filter: The resulting image of Max - min is very similar to the Horizontal + Vertical addition of the gradient filter: It has sharp edges as high-intensity pixels.
-    * Effectively, every homogenous part of the image is both in the max and min - and thus removed from the last image. Every part where there is a high max & low min or high min & low max is amplified - and every part that is changing from max to min and vice-versa is an edge.
+* Max - Min filter: The resulting image of Max - min is very similar to the Horizontal + Vertical addition of the gradient filter and of the LoG. In fact, the result seems to be in the middle of both characteristics: Not as much activations as the LoG, but still a better directionnality than the gradients.
+    * Effectively, every homogenous part of the image is both in the max and min - and thus removed from the last image. Every part where there is a high max & low min or high min & low max is amplified - and every part that is changing from max to min and vice-versa is an edge. As the min/max work on all x neighbourhood pixels, all directions are taken into account.
 
 ### Neighbourood size
 The neighbourood size testes are 3\*3 and 5\*5. Although the 3\*3 filter shows great results, the 5\*5 filter is lacking in the sense that has a blurring effect. This could be because the min/max neighbourood being too great displaces the min/max values too far out of their regions. The resulting Max-Min image is also blurred and the edges are less sharp and ill defined.
