@@ -1,0 +1,34 @@
+{
+    "images": {
+        "Candida.albicans_0004.png": {
+            "bacteryCount": [23]
+        },
+        "Candida.albicans_0008.png": {
+            "bacteryCount": [47, 48]
+        },
+        "Candida.albicans_0011.png": {
+            "bacteryCount": [25]
+        },
+        "Candida.albicans_0013.png": {
+            "bacteryCount": [16]
+        },
+        "Candida.albicans_0015.png": {
+            "bacteryCount": [13, 14]
+        },
+        "Candida.albicans_0016.png": {
+            "bacteryCount": [15]
+        },
+        "Candida.albicans_0017.png": {
+            "bacteryCount": [15, 16, 17, 18]
+        },
+        "Candida.albicans_0018 copy.png": {
+            "bacteryCount": [10, 11]
+        },
+        "Candida.albicans_0018.png": {
+            "bacteryCount": [19, 20]
+        },
+        "Candida.albicans_0020.png": {
+            "bacteryCount": [25]
+        }
+    }
+}
