@@ -1,57 +1,33 @@
 import cv2
-from algo import AlgorithmProcessor, HyperParametersBundle, ResultBundle, MorphOperation
-import matplotlib.pyplot as plt
-import numpy as np
-
+from algo import MorphOperation
+from cross_search import HyperParametersBundleMatrix
+import cross_search
 
 if __name__ == "__main__":
     print(f"Starting algorithm")
 
-    k = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    o1 = MorphOperation(0, cv2.MORPH_DILATE)
-    o2 = MorphOperation(0, cv2.MORPH_OPEN)
-    o3 = MorphOperation(1, cv2.MORPH_OPEN)
-    hyper_parameters = HyperParametersBundle(k, o1, o2, o3)
-    algorithm_processor = AlgorithmProcessor()
+    hyper_parameters_search_matrix = HyperParametersBundleMatrix(
+        [cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))], #Morph kernel options
 
-    for image_name in ["Candida.albicans_0004.png", "Candida.albicans_0008.png", "Candida.albicans_0018 copy.png"]:
-        
-        res: ResultBundle = algorithm_processor.process(image_name, hyper_parameters)
-        print(f"{res.image_name}: diff={res.diff} Expected {res.expected_count}, got {res.count}")
+        [MorphOperation(0, None)] + [MorphOperation(iter, cv2.MORPH_DILATE) for iter in range(1, 3)], #Kmean morphs
+        [MorphOperation(0, None)] + [MorphOperation(iter, cv2.MORPH_OPEN) for iter in range(1, 3)] \
+            + [MorphOperation(iter, cv2.MORPH_ERODE) for iter in range(1, 3)], #Dist morphs
+        [MorphOperation(0, None)] + [MorphOperation(iter, cv2.MORPH_OPEN) for iter in range(1, 3)] \
+            + [MorphOperation(iter, cv2.MORPH_ERODE) for iter in range(1, 3)], #Bin morphs
 
-        images = [    
-            res.original_image,
-            res.kmean_image,
-            res.suppressed_image,
-            res.kmean_bin_image,
-            res.distance_image,
-            res.distance_bin,
-            res.distance_bin_2,
-            res.marker_image,
-            res.watershed_image,
-            res.annotated_image,
-        ]
+        [(min_r/100, 1.0) for min_r in range(30, 60, 5)], #Dist threshold values
+    )
 
-        image_names = [    
-            "res.original_image",
-            "res.kmean_image",
-            "res.suppressed_image",
-            "res.kmean_bin_image",
-            "res.distance_image",
-            "res.distance_bin",
-            "res.distance_bin_2",
-            "res.marker_image",
-            "res.watershed_image",
-            "res.annotated_image",
-        ]
-        
-        fig, ax = plt.subplots(1, len(images))
-        for i, im in enumerate(images):
-            ax[i].set_axis_off()
-            ax[i].set_title(image_names[i])
-            if len(im.shape) == 3:
-                ax[i].imshow(im)
-            else:
-                ax[i].imshow(im, cmap="gray", vmin=np.min(im), vmax=np.max(im))
+    hyper_parameters_search_matrix = HyperParametersBundleMatrix(
+        [cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))], #Morph kernel options
 
-        plt.show()
+        [MorphOperation(0, None), MorphOperation(1, cv2.MORPH_DILATE)], #Kmean morphs
+        [MorphOperation(0, None)] + [MorphOperation(iter, cv2.MORPH_OPEN) for iter in range(1, 3)] \
+            + [MorphOperation(iter, cv2.MORPH_ERODE) for iter in range(1, 3)], #Dist morphs
+        [MorphOperation(iter, cv2.MORPH_OPEN) for iter in range(1, 3)] \
+            + [MorphOperation(iter, cv2.MORPH_ERODE) for iter in range(1, 3)], #Bin morphs
+
+        [(min_r/100, 1.0) for min_r in range(40, 55, 5)], #Dist threshold values
+    )
+
+    cross_search.search_matrix(hyper_parameters_search_matrix)
