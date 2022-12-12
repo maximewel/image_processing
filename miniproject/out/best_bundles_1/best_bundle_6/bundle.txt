@@ -1,0 +1,9 @@
+Hyper parameters:
+
+HyperParametersBundle(morph_kernel=array([[1, 1, 1],
+       [1, 1, 1],
+       [1, 1, 1]], dtype=uint8), repair_lost_baterias=True, dist_transform_morh=MorphOperation(iterations=[2], type=2), binarized_dist_morph=MorphOperation(iterations=[1, 2, 3, 3, 2], type=0), dist_threshold_range=(0.0, 1.0))
+
+Results: 
+	Differences=2([0, 0, 1, 0, 0, 1, 0, 0, 0, 0])
+	Runtime=14.459([1.064, 3.504, 0.859, 1.505, 0.963, 0.786, 1.475, 1.14, 2.062, 1.101])
