@@ -1,121 +1,15 @@
 from __future__ import annotations
 #Image proc imports
-import matplotlib.pyplot as plt
 from random import randint
 import numpy as np
 import cv2
 from cv2 import Mat
 import os
 from typing import Tuple, List
-
-#Other imports
-from dataclasses import dataclass
 import json
+import time
 
-@dataclass
-class HyperParametersBundle():
-    """A single morph kernel is used throughought the project in order to reduce the
-    number of kernel possibilities"""
-    morph_kernel: tuple #Recommended: See cv2.getStructuringElement
-
-    kmean_median_channel_morph: MorphOperation
-    dist_transform_morh: MorphOperation
-    binarized_dist_morph: MorphOperation
-
-    #Threshold to apply on the normalized distance image between [0.0, 1.0]
-    dist_threshold_range: Tuple[float,float]
-
-class ResultBundle():
-    image_name: str 
-
-    #Images
-    original_image: Mat
-    kmean_mask_image: Mat
-    suppressed_image: Mat
-    distance_image: Mat
-    distance_bin: Mat
-    distance_bin_morph: Mat
-    marker_image: Mat
-    watershed_image: Mat
-    annotated_image: Mat
-    kmean_bin_image: Mat
-
-    #Quantified results
-    count: int
-    expected_count: list[int]
-    diff: int
-
-    def figure(self):
-        kmean_images = [
-            ("K-mean mask", self.kmean_mask_image),
-            ("Supressed image", self.suppressed_image),
-            ("Binarized K-means image", self.kmean_bin_image)
-        ]
-
-        distance_images = [
-            ("Distance image", self.distance_image),
-            ( "Binarized distance image", self.distance_bin),
-            ("Morphed binary distance", self.distance_bin_morph)
-        ]
-
-        watershed_images = [
-            ("Marker image", self.marker_image),
-            ("Watershed results", self.watershed_image),
-            ("Annotated image", self.annotated_image),
-        ]
-        
-        fig, axes = plt.subplots(4, 1, constrained_layout=True, dpi=150)
-        fig.suptitle(f"Result images for image {self.image_name}", fontweight="bold", fontsize="x-large")
-        subfigs = fig.subfigures(nrows=4, ncols=1)
-
-        #Place orig image
-        subfig = subfigs[0]
-        axes = subfig.subplots(nrows=1, ncols=3)
-        axes[0].set_axis_off()
-        axes[1].set_title("Original image")
-        axes[1].set_axis_off()
-        axes[1].imshow(self.original_image)
-        axes[2].set_axis_off()
-
-        #Place Kmeans
-        subfig = subfigs[1]
-        subfig.suptitle("Kmean processing", fontweight="bold", fontsize="large")
-        kmean_ax = subfig.subplots(nrows=1, ncols=3)
-        for i, (name, im) in enumerate(kmean_images):
-            kmean_ax[i].set_axis_off()
-            kmean_ax[i].set_title(name)
-            self.plt_adaptative_imshow(kmean_ax[i], im)
-
-        #Place dist
-        subfig = subfigs[2]
-        subfig.suptitle("Distance transform processing", fontweight="bold", fontsize="large")
-        dist_ax = subfig.subplots(nrows=1, ncols=3)        
-        for i, (name, im) in enumerate(distance_images):
-            dist_ax[i].set_axis_off()
-            dist_ax[i].set_title(name)
-            self.plt_adaptative_imshow(dist_ax[i], im)
-
-        #Place watershed
-        subfig = subfigs[3]
-        subfig.suptitle("Watershed processing", fontweight="bold", fontsize="large")
-        watershed_ax = subfig.subplots(nrows=1, ncols=3)
-        for i, (name, im) in enumerate(watershed_images):
-            watershed_ax[i].set_axis_off()
-            watershed_ax[i].set_title(name)
-            self.plt_adaptative_imshow(watershed_ax[i], im)
-
-        return fig
-    
-    def plt_adaptative_imshow(self, ax, im):
-        if len(im.shape) == 3:
-            ax.imshow(im)
-        else:
-            ax.imshow(im, cmap="gray", vmin=np.min(im), vmax=np.max(im))
-
-@dataclass
-class MorphOperation():
-    iterations: int
-    type: int #cv2.MORPH_XXX (Open, close, dilate, erode)
+from data_classes import MorphOperation, HyperParametersBundle, ResultBundle
 
 class AlgorithmProcessor():
     labels: dict
@@ -136,7 +30,46 @@ class AlgorithmProcessor():
             print(f"Impossible to load label")
             raise IOError(str(e))
 
-    def apply_kmean(self, image: Mat, hyper_parameter_bundle: HyperParametersBundle, output_bundle: ResultBundle) -> Tuple[Mat, Mat]:
+    # Operation from Gregoire Rebstein at, see: https://github.com/Drawfan/image-processing/blob/main/project/counting_bacteria.ipynb
+    def reconstruct(self, image, markers):
+        """Reconstruct an image according to the list of markers - rebuild markers if they don't existe anymore"""
+        for i in range(1, markers.max() + 1):
+            if len(set(image[markers==i])) == 1:
+                image[markers == i] = 255
+
+    def apply_morphology(self, image: Mat, kernel: Tuple, morph_operation: MorphOperation, repair_lost: bool) -> Mat:
+        """Apply the given morphology operation on the image in place.
+        
+        Args
+        -----
+
+
+        Returns
+        -----
+
+        """
+
+        iterations = morph_operation.iterations
+
+
+        if (isinstance(iterations, int) and iterations <= 0):
+            return image
+
+        if isinstance(iterations, int):
+            iterations = [iterations]
+
+        for iteration in iterations:
+            if repair_lost:
+                _, markers = cv2.connectedComponents(image)
+                image = cv2.morphologyEx(image, morph_operation.type, kernel, iterations=iteration)
+                # Recreate potential deleted bacteria
+                self.reconstruct(image, markers)
+            else:
+                image = cv2.morphologyEx(image, morph_operation.type, kernel, iterations=iteration)
+        
+        return image
+
+    def apply_kmean(self, image: Mat, output_bundle: ResultBundle) -> Tuple[Mat, Mat]:
         """Apply the k-mean algorithm to:
         * Separate an image in 3 channels
         * Extract the median channel as a mask
@@ -166,21 +99,18 @@ class AlgorithmProcessor():
         max_index = np.argmax(averages)
         med_index = list(set((0,1,2)) - set((min_index, max_index)))[0]
 
+        #Suppress medium center directly in center array
+        center[med_index] = center[max_index] #Replace by background
+
+        res = center[label.flatten()]
+        suppressed_image = res.reshape((image.shape))
+        output_bundle.suppressed_image = suppressed_image
+        
         #Create 1D binary mask that is active only on medium channel
         x,y,_ = image.shape
         label = label.reshape((x,y))
         binary_mask = np.uint8(np.vectorize(lambda x: 1 if x==med_index else 0)(label))
-        #Apply morph on medium channel
-        mask_morph = hyper_parameter_bundle.kmean_median_channel_morph
-        if mask_morph.iterations > 0:
-            binary_mask = cv2.morphologyEx(binary_mask, mask_morph.type, hyper_parameter_bundle.morph_kernel, iterations=mask_morph.iterations)
         output_bundle.kmean_mask_image = binary_mask
-
-        #Compute supressed image by taking original one And removing the modified median channel
-        suppressed_image = image.copy()
-        suppressed_image[label == max_index] = center[max_index] #Force background as one color
-        suppressed_image[binary_mask == 1] = center[max_index] #Middle vlue-effect channel (eventually morphed) masked as background color
-        output_bundle.suppressed_image = suppressed_image
 
         #Binarize supressed image to obtain binarized image
         gray_image = cv2.cvtColor(suppressed_image, cv2.COLOR_RGB2GRAY)
@@ -206,21 +136,19 @@ class AlgorithmProcessor():
         """        
         #Apply dist transform and normalize
         dist_transform = cv2.distanceTransform(binarized_image, cv2.DIST_L2, 3, dstType=cv2.CV_8U)
-        cv2.normalize(dist_transform, dist_transform, 0, 1.0, cv2.NORM_MINMAX)
+        dist_transform = cv2.normalize(dist_transform, np.zeros_like(dist_transform), 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
         #Dist transform morph operation
         dist_morph = hyper_parameter_bundle.dist_transform_morh
-        if dist_morph.iterations > 0:
-            dist_transform = cv2.morphologyEx(dist_transform, dist_morph.type, hyper_parameter_bundle.morph_kernel, iterations=dist_morph.iterations)
+        dist_transform = self.apply_morphology(dist_transform, hyper_parameter_bundle.morph_kernel, dist_morph, hyper_parameter_bundle.repair_lost_baterias)
         output_bundle.distance_image = dist_transform
     
         # Threshold dist transform 
         thresh_min, thresh_max = hyper_parameter_bundle.dist_threshold_range
-        _, distance_image = cv2.threshold(dist_transform, thresh_min, thresh_max, cv2.THRESH_BINARY)
+        _, distance_image = cv2.threshold(dist_transform, thresh_min*255, thresh_max*255, cv2.THRESH_BINARY)
         output_bundle.distance_bin = distance_image
         # apply yet anoter morph
         binarized_morph = hyper_parameter_bundle.binarized_dist_morph
-        if binarized_morph.iterations > 0:
-            distance_image = cv2.morphologyEx(distance_image, binarized_morph.type, hyper_parameter_bundle.morph_kernel, iterations=binarized_morph.iterations)
+        distance_image = self.apply_morphology(distance_image, hyper_parameter_bundle.morph_kernel, binarized_morph, hyper_parameter_bundle.repair_lost_baterias)
         output_bundle.distance_bin_morph = distance_image
 
         return distance_image
@@ -314,6 +242,7 @@ class AlgorithmProcessor():
         return diff
 
     def process(self, image_name: str, image: Mat|None, hyper_parameter_bundle: HyperParametersBundle) -> ResultBundle:
+        start_time = time.time()
         output_bundle = ResultBundle()
         output_bundle.image_name = image_name
         image_label = self.labels["images"][image_name]
@@ -325,7 +254,7 @@ class AlgorithmProcessor():
         output_bundle.original_image = image
         
         ### K-means ###
-        suppressed_image, binarized_image = self.apply_kmean(image, hyper_parameter_bundle, output_bundle)
+        suppressed_image, binarized_image = self.apply_kmean(image, output_bundle)
 
         ### Distance transform ###
         distance_image = self.apply_distance_tranform(binarized_image, hyper_parameter_bundle, output_bundle)
@@ -341,4 +270,32 @@ class AlgorithmProcessor():
         ### Optional- WATERSHED ###
         self.apply_watershed(image, suppressed_image, markers, bacteria_count, output_bundle)
 
+        output_bundle.runtime_s = round((time.time() - start_time), 3)
+
         return output_bundle
+
+if __name__ == "__main__":
+    algo = AlgorithmProcessor()
+
+    from data_classes import HyperParametersBundle
+
+    hyp = HyperParametersBundle(
+            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), #Morph kernel options
+            True, #Whether to repair bacterias
+
+            #Dist morphs
+            MorphOperation(0, None),
+            
+            #Bin morphs
+            MorphOperation([1,2,3,4,5], cv2.MORPH_ERODE), 
+
+            (0.0, 1.0), #Dist threshold values
+        )
+
+    res = algo.process("Candida.albicans_0004.png", None, hyp)
+
+    res.figure_all()
+    import matplotlib.pyplot as plt
+    plt.show()
+
+    print(res.runtime_s)
